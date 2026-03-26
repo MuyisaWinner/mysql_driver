@@ -206,7 +206,3 @@ mysql_driver:
 ```
 
 Don't forget to switch back again, when you're done with debugging.
-
-### Support the author 🇺🇦
-
-Based on the work of @author_name.
