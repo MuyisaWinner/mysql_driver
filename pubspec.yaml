@@ -1,6 +1,6 @@
 name: mysql_driver
 description: Native MySQL client written in Dart. Tested with MySQL Percona Server (5.7, 8), MariaDB (10). Supports TLS.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/MuyisaWinner/mysql_driver
 repository: https://github.com/MuyisaWinner/mysql_driver
 platforms:

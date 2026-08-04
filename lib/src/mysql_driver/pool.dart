@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:mysql_driver/exception.dart';
 import 'package:mysql_driver/mysql_driver.dart';
 
 /// Class to create and manage pool of database connections
@@ -94,9 +95,11 @@ class MySQLConnectionPool {
   FutureOr<T> withConnection<T>(
       FutureOr<T> Function(MySQLConnection conn) callback) async {
     final conn = await _getFreeConnection();
-    final result = await callback(conn);
-    _releaseConnection(conn);
-    return result;
+    try {
+      return await callback(conn);
+    } finally {
+      _releaseConnection(conn);
+    }
   }
 
   /// See [MySQLConnection.transactional]
@@ -107,11 +110,12 @@ class MySQLConnectionPool {
     });
   }
 
-  Future<MySQLConnection> _getFreeConnection() async {
-    // if there is idle connection, return it
+  Future<MySQLConnection> _getFreeConnection({Duration? timeout}) async {
+    timeout ??= Duration(seconds: 5); // ou 10s max
+
+    // Si idle dispo, on prend
     if (_idleConnections.isNotEmpty) {
-      final conn = _idleConnections.first;
-      _idleConnections.remove(conn);
+      final conn = _idleConnections.removeAt(0);
       _activeConnections.add(conn);
       return conn;
     }
@@ -138,10 +142,19 @@ class MySQLConnectionPool {
 
       return conn;
     } else {
-      // wait for idle connection
-      await Future.doWhile(() => idleConnectionsQty == 0);
-      final conn = _idleConnections.first;
-      _idleConnections.remove(conn);
+      final sw = Stopwatch()..start();
+      await Future.doWhile(() async {
+        if (_idleConnections.isNotEmpty) return false;
+        if (sw.elapsed > timeout!) {
+          throw MySQLClientException(
+              "Pool épuisé : aucune connexion disponible après ${timeout.inSeconds}s "
+              "(active: $activeConnectionsQty, idle: $idleConnectionsQty, max: $maxConnections)");
+        }
+        await Future.delayed(Duration(milliseconds: 50));
+        return true;
+      });
+
+      final conn = _idleConnections.removeAt(0);
       _activeConnections.add(conn);
       return conn;
     }
